@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disease Prediction</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Styling */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #cff6ce;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        h1 {
+            color: #4CAF50;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        h3, h4 {
+            color: #333;
+            font-weight: 500;
+            margin: 20px 0 10px;
+        }
+
+        input {
+            padding: 12px;
+            margin-top: 5px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus {
+            border-color: #4CAF50;
+        }
+
+        button {
+            padding: 12px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            color: #fff;
+            background-color: #4CAF50; /* Green Button */
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #43a047; /* Darker Green on Hover */
+        }
+
+        #symptomList {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+            text-align: left;
+            display: inline-block;
+        }
+
+        #symptomList li {
+            background-color: #e8f5e9;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+
+        #predictionResult {
+            margin-top: 20px;
+            font-size: 1.1em;
+            text-align: left;
+            display: inline-block;
+            color: #333;
+        }
+
+        canvas {
+            margin-top: 20px;
+        }
+
+        .clear-button {
+            background-color: #f44336; /* Red */
+            color: white;
+        }
+
+        .clear-button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Disease Prediction</h1>
+        <div>
+            <h3>Enter Symptoms:</h3>
+            <input type="text" id="symptomInput" placeholder="Enter a symptom" required>
+            <button onclick="addSymptom()">Add Symptom</button>
+            <button class="clear-button" onclick="clearSymptoms()">Clear Symptoms</button>
+        </div>
+        <div>
+            <h4>Symptoms List:</h4>
+            <ul id="symptomList"></ul>
+        </div>
+        <button onclick="predict()">Predict Disease</button>
+
+        <div id="predictionResult"></div>
+        <canvas id="probabilityChart" width="400" height="200"></canvas>
+    </div>
+
+    <script>
+        let symptoms = [];
+
+        function addSymptom() {
+            const symptomInput = document.getElementById('symptomInput');
+            const symptom = symptomInput.value.trim();
+            if (symptom) {
+                symptoms.push(symptom);
+                const symptomList = document.getElementById('symptomList');
+                const li = document.createElement('li');
+                li.textContent = symptom;
+                symptomList.appendChild(li);
+                symptomInput.value = '';
+            } else {
+                alert("Please enter a valid symptom.");
+            }
+        }
+
+        function predict() {
+            if (symptoms.length <= 2) {
+                document.getElementById('predictionResult').textContent = "Please provide more than two symptoms for an accurate prediction.";
+                return;
+            }
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symptoms: symptoms.join(', ') })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultElement = document.getElementById('predictionResult');
+                if (data.message) {
+                    resultElement.textContent = data.message;
+                } else {
+                    resultElement.innerHTML = 
+                        `<strong>Prediction:</strong> ${data.disease || "No prediction made"}<br>
+                        <strong>Treatment:</strong> ${data.treatment || "No treatment available"}<br>
+                        <strong>Recommended Doctor:</strong> ${data.doctor || "No doctor available"}`;
+                    displayProbabilities(data.probabilities);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('predictionResult').textContent = "An error occurred while making the prediction.";
+            });
+        }
+
+        function clearSymptoms() {
+            symptoms = [];
+            document.getElementById('symptomList').innerHTML = ''; // Clear the symptoms list
+            document.getElementById('predictionResult').innerHTML = ''; // Clear the prediction result
+            document.getElementById('symptomInput').value = ''; // Clear the input field
+        }
+
+        function displayProbabilities(probabilities) {
+            // Sort probabilities in descending order
+            const sortedProbabilities = Object.entries(probabilities).sort((a, b) => b[1] - a[1]);
+            const labels = sortedProbabilities.map(item => item[0]);
+            const dataValues = sortedProbabilities.map(item => item[1]);
+
+            const ctx = document.getElementById('probabilityChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Disease Probabilities',
+                        data: dataValues,
+                        backgroundColor: [
+                            '#e57373', '#81c784', '#64b5f6', '#ffb74d', '#4fc3f7'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Probability'
+                            }
+                        }
+                    },
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ' + (context.raw * 100).toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

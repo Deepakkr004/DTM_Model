@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dtm-model
+  labels:
+    app: dtm-model
+spec:
+  replicas: 1  # Adjust if you want multiple replicas
+  selector:
+    matchLabels:
+      app: dtm-model
+  template:
+    metadata:
+      labels:
+        app: dtm-model
+    spec:
+      containers:
+      - name: dtm-model
+        image: dtm_model  # Use local Docker image
+        imagePullPolicy: Never  # Ensures Kubernetes doesn't try to pull from Docker Hub
+        ports:
+        - containerPort: 5000
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
